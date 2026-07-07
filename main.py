@@ -4,7 +4,8 @@ from queue import Queue
 from threading import Thread
 from collections import Counter
 
-from ultralytics import YOLO
+# from ultralytics import YOLO
+import torch
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from DBConnection import *
@@ -159,14 +160,17 @@ def process(items, model, classes):
         except Exception as e:
             print(f"[PROCESSOR][ERROR] Save Original Image -> {e}")    
     
-    # YOLO model inference
-    print(f"[YOLO][PREDICT] {Fname}")
-    results = model.predict(
-        source=img_paths,
-        conf=0.65,
-        iou=0.4,
-        save=False
-        )
+    # YOLO model inference    
+    print(f"[INFERENCE][START]")
+    with torch.no_grad():        
+        results = model.predict(
+            source=img_paths,
+            conf=0.65,
+            iou=0.4,
+            save=False
+            )
+
+    print(f"[INFERENCE][END] total={len(results)}")
 
     detected_labels = []
 
@@ -185,7 +189,7 @@ def process(items, model, classes):
     # Handle exception: No objects detected
     if not class_counts: 
         detected_label = 'No Detection'            
-        print(f"[YOLO][PREDICT] {Fname} -> No Detection")
+        print(f"[INFERENCE] Results {Fname} -> No Detection")
 
         # Clean up temporary folders
         shutil.rmtree(pred_dir, ignore_errors=True)
@@ -235,6 +239,8 @@ def process(items, model, classes):
 if __name__ == '__main__':
     print(f"[SYSTEM][START] BASE_DIR -> {BASE_DIR}")
     print(f"[SYSTEM][START] SHARED -> {SHARED}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
     DATASETS_DIR.mkdir(parents=True, exist_ok=True)
     INFER_INP_IMG_DIR.mkdir(parents=True, exist_ok=True)
@@ -244,29 +250,25 @@ if __name__ == '__main__':
     shutil.rmtree(PREDICT_DIR, ignore_errors=True)
     print("[SYSTEM][INIT] Predict Directory Removed")
 
-    try: 
-        result = select(table=TRAIN_INFO_TABLE, columns="MODELNAME", extra="ORDER BY TRAINDATE DESC LIMIT 1")
-        modelname = result[0][0] if result else None
-        if not modelname:
-            raise ValueError("No trained model information.")
-        else: modelname = modelname.split('.')[0]
+    # Load Model
+    model_files = sorted(MODELS_PATH.glob("*.pth"))
+    if not model_files:
+        raise FileNotFoundError("No .pth model found in models folder.")
+    model_path = model_files[-1]
 
-        model_path = DETECT_DIR / modelname / "weights" / "best.pt"
-        final_model = YOLO(str(model_path))
-        print(f"[SYSTEM][MODEL] Loaded -> {model_path}")
-
-    except Exception as e:
-        print(f"[SYSTEM][MODEL][ERROR] {e}")
-        sys.exit(1)
-
-
+    print(f"[MODEL][LOAD] START: {model_path}")
+    ckpt = torch.load(model_path, map_location=device)
+    model = MultiviewVisionModel(**ckpt["config"])
+    model.load_state_dict(ckpt["state_dict"])
+    print(f"[MODEL][LOAD] -> SUCCESS")
+    
     # Load class names
     with open(CLASSES_TXT, 'r') as f:
         classes = f.read().splitlines()
     
     # THREAD START
     Thread(target=dispatcher, daemon=True).start()
-    Thread(target=processor, args=(final_model, classes, ), daemon=True).start()
+    Thread(target=processor, args=(model, classes, ), daemon=True).start()
     print("[SYSTEM][THREAD] Dispatcher Started")
     print("[SYSTEM][THREAD] Processor Started")
 
