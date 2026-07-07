@@ -1,0 +1,3 @@
+# 보안 및 경로 설정 파일 제외
+paths.py
+db_settings.json
