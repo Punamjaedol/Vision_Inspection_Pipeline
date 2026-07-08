@@ -8,6 +8,7 @@ from collections import Counter
 import torch
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from MultiViewModel import MultiviewYOLODetector
 from DBConnection import *
 from Utils import *
 from config import *
@@ -258,7 +259,7 @@ if __name__ == '__main__':
 
     print(f"[MODEL][LOAD] START: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
-    model = MultiviewVisionModel(**ckpt["config"])
+    model = MultiviewYOLODetector(**ckpt["config"])
     model.load_state_dict(ckpt["state_dict"])
     print(f"[MODEL][LOAD] -> SUCCESS")
     

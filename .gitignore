@@ -1,2 +1,4 @@
-paths.py
-db_settings.json
+__pycache__/
+*.py[cod]
+*$py.class
+yolov8n.pt
