@@ -164,25 +164,23 @@ def process(items, model, classes):
     # YOLO model inference    
     print(f"[INFERENCE][START]")
     with torch.no_grad():        
-        results = model.predict(
-            source=img_paths,
-            conf=0.65,
-            iou=0.4,
-            save=False
-            )
+        results = model.predict(img_paths)
 
     print(f"[INFERENCE][END] total={len(results)}")
 
     detected_labels = []
-
-    for result in results:
-        if not hasattr(result, 'probs') or result.probs is None:
+    for pred in results:
+        if pred is None or len(pred) == 0:
             continue
-        conf = float(result.probs.top1conf.item())
-        if conf >= 0.9:
-            cls_id = int(result.probs.top1.item())
-            label = model.names[cls_id]
+        for det in pred:
+            x1, y1, x2, y2, conf, cls = det[:6]
+            conf = float(conf)
+            if conf < 0.9:
+                continue
+            cls = int(cls)
+            label = model.names[cls]
             detected_labels.append(label)
+            
 
     class_counts = dict(Counter(detected_labels))
     detect_products_cnt = [{"PRODUCTNAME": label, "PRODUCT_QTY": count} for label, count in class_counts.items()]
@@ -252,7 +250,7 @@ if __name__ == '__main__':
     print("[SYSTEM][INIT] Predict Directory Removed")
 
     # Load Model
-    model_files = sorted(MODELS_PATH.glob("*.pth"))
+    model_files = sorted(MODELS_DIR.glob("*.pth"))
     if not model_files:
         raise FileNotFoundError("No .pth model found in models folder.")
     model_path = model_files[-1]
