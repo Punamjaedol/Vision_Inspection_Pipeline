@@ -97,8 +97,8 @@ class MultiviewYOLODetector(nn.Module):
 
     def predict(self, integerated_img):
         """
-        [수정된 추론 단계]
-        실제 공정 라인에서 세 각도의 이미지를 동시에 찔러 넣으면, 
+        [추론 단계]
+        세 각도의 이미지를 동시에 찔러 넣으면, 
         이를 하나로 종합 연산하여 최종 통합 바운딩 박스와 클래스 결과를 뽑아냅니다.
         """
         self.eval()
